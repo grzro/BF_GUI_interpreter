@@ -15,11 +15,12 @@ public class MainClass extends JFrame implements KeyListener {
 	private JButton runButton;
 	private ActionListener actionLnr;
 	private Font consoleLikeFont;
+	private JLabel inProgressInfoLabel, charInputInfoLabel, finishInfoLabel;
 
 	ParseMechanism parser;
 	Thread updateGUIthread;
 	Thread parserThr;
-	
+
 	String startCodeStr;
 
 	public MainClass() {
@@ -29,9 +30,9 @@ public class MainClass extends JFrame implements KeyListener {
 			public void actionPerformed(ActionEvent e) {
 				if (e.getSource() == runButton) {
 					outputArea.setText("");
-					
+
 					parse(codeArea.getText());
-										
+
 					updateGUIthread = new Thread() {
 						@Override
 						public void run() {
@@ -39,11 +40,21 @@ public class MainClass extends JFrame implements KeyListener {
 								try {
 									Thread.sleep(1);
 									int flag = parser.getState().current;
-									if (flag == Flag.GET_CHAR)
+									switch (flag) {
+									case Flag.GET_CHAR:
 										readCharByOutputArea();
-									if (flag == Flag.TO_PRINT) {
+										break;
+									case Flag.TO_PRINT:
 										appendCharToOutputArea(parser.getCharToPrint());
+										break;
+									case Flag.LOOP_ERROR:
+										outputArea.setText("Number of [ and ] is not equal");
+										break;
+									case Flag.OUT_OF_MEM_BOUNDS:
+										outputArea.setText("Out od memory bounds");
+										break;
 									}
+									showInfo(parser.getState());
 								} catch (Exception e) {
 								}
 							}
@@ -54,25 +65,16 @@ public class MainClass extends JFrame implements KeyListener {
 
 			}
 		};
-		//Hello world program written to codeArea
-		startCodeStr = "++++++++++\r\n" + 
-				"[\r\n" + 
-				">+++++++>++++++++++>+++>+<<<<-\r\n" + 
-				"]\r\n" + 
-				">++.               drukuje 'H'\r\n" + 
-				">+.                drukuje 'e'\r\n" + 
-				"+++++++.           drukuje 'l'\r\n" + 
-				".                  drukuje 'l'\r\n" + 
-				"+++.               drukuje 'o'\r\n" + 
-				">++.               spacja\r\n" + 
-				"<<+++++++++++++++. drukuje 'W'\r\n" + 
-				">.                 drukuje 'o'\r\n" + 
-				"+++.               drukuje 'r'\r\n" + 
-				"------.            drukuje 'l'\r\n" + 
-				"--------.          drukuje 'd'\r\n" + 
-				">+.                drukuje '!'\r\n" + 
-				">.                 nowa linia";
-		
+		// Hello world program written to codeArea
+		startCodeStr = "++++++++++\r\n" + "[\r\n" + ">+++++++>++++++++++>+++>+<<<<-\r\n" + "]\r\n"
+				+ ">++.               drukuje 'H'\r\n" + ">+.                drukuje 'e'\r\n"
+				+ "+++++++.           drukuje 'l'\r\n" + ".                  drukuje 'l'\r\n"
+				+ "+++.               drukuje 'o'\r\n" + ">++.               spacja\r\n"
+				+ "<<+++++++++++++++. drukuje 'W'\r\n" + ">.                 drukuje 'o'\r\n"
+				+ "+++.               drukuje 'r'\r\n" + "------.            drukuje 'l'\r\n"
+				+ "--------.          drukuje 'd'\r\n" + ">+.                drukuje '!'\r\n"
+				+ ">.                 nowa linia";
+
 		// WINDOW
 		setSize(540, 400);
 		setTitle("BrainFuck Interpreter by G.Romanczyk");
@@ -91,7 +93,6 @@ public class MainClass extends JFrame implements KeyListener {
 		codeArea.setTabSize(2); // tab size of 2 spaces
 		codeArea.setText(startCodeStr);
 		codeArea.setBackground(new Color(236, 242, 249));
-		// codeArea.addKeyListener(this); // DEBUG
 
 		scrollCodeArea = new JScrollPane(codeArea); // assign JScrollPane to the text area
 		scrollCodeArea.setBounds(5, 5, 440, 245);
@@ -114,24 +115,59 @@ public class MainClass extends JFrame implements KeyListener {
 		runButton.setBounds(450, 5, 70, 30);
 		runButton.addActionListener(actionLnr);
 
+		// labels with information about state of parsing and executing
+		inProgressInfoLabel = new JLabel("in progress");
+		inProgressInfoLabel.setBounds(450, 325, 90, 40);
+		inProgressInfoLabel.setOpaque(true);
+		inProgressInfoLabel.setVisible(false);
+
+		charInputInfoLabel = new JLabel("input char");
+		charInputInfoLabel.setBounds(455, 325, 90, 40);
+		charInputInfoLabel.setOpaque(true);
+		charInputInfoLabel.setVisible(false);
+
+		finishInfoLabel = new JLabel("Finish");
+		finishInfoLabel.setBounds(465, 325, 90, 40);
+		finishInfoLabel.setOpaque(true);
+		finishInfoLabel.setVisible(false);
+
 		// Adding elements to the window
 		add(scrollCodeArea);
 		add(scrollOutputArea);
 		add(runButton);
+		add(inProgressInfoLabel);
+		add(charInputInfoLabel);
+		add(finishInfoLabel);
 
+	}
+
+	private void showInfo(Flag info) {
+		switch (info.current) {
+		case Flag.FINISH:
+			finishInfoLabel.setVisible(true);
+			inProgressInfoLabel.setVisible(false);
+			charInputInfoLabel.setVisible(false);
+			break;
+		case Flag.IN_PROGRESS:
+			inProgressInfoLabel.setVisible(true);
+			finishInfoLabel.setVisible(false);
+			charInputInfoLabel.setVisible(false);
+			break;
+		case Flag.GET_CHAR:
+			finishInfoLabel.setVisible(false);
+			inProgressInfoLabel.setVisible(false);
+			charInputInfoLabel.setVisible(true);
+			break;
+		}
 	}
 
 	public void appendCharToOutputArea(char ch) {
 		outputArea.setText(outputArea.getText() + Character.toString(ch));
 	}
 
-	public synchronized void readCharByOutputArea() { //synchronized fix a bit
-		System.out.println("Begining of readCharByOutput()");
-		
+	public synchronized void readCharByOutputArea() {
 		outputArea.setEditable(true);
 		outputArea.requestFocus();
-
-		System.out.println("unlocked field, request focus");
 	}
 
 	@Override

@@ -37,8 +37,9 @@ public class ParseMechanism implements Runnable {
 	public static int countAllOccurrences(String str, char ch) {
 		int lastIndex = 0;
 		int count = 0;
-		while ((lastIndex = str.indexOf((int) ch, lastIndex + 1)) != -1)
+		while ((lastIndex = str.indexOf(ch, (lastIndex > 0) ? lastIndex + 1: 0)) != -1)
 			count++;
+
 		return count;
 	}
 
@@ -69,12 +70,12 @@ public class ParseMechanism implements Runnable {
 
 		++instrCounter;
 
-		flag.current = Flag.IN_PROGRESS;
-
 		if (instrCounter == totalInstrCounter) { // there are no further instructions
 			flag.current = Flag.FINISH;
 			return flag;
 		}
+		
+		flag.current = Flag.IN_PROGRESS;
 
 		switch (code[instrCounter]) {
 		case '.': // print mem cell

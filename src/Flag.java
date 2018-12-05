@@ -7,7 +7,6 @@ public class Flag {
 	static final int DOING_NOTHING = 6;
 	static final int PARSED = 7;
 	static final int TO_PRINT = 8;
-	static final int NO_CODE_TO_PARSE = 9;
 	
 	int current = DOING_NOTHING;
 	
