@@ -1,14 +1,11 @@
-import java.util.Arrays;
 import java.util.Stack;
 
 public class ParseMechanism implements Runnable {
-	private Flag flag;
+	private Flag flag; //current state of parse Mechanism
 
-	final int MAX_MEM_SIZE = 3000; // number of memory cells
-	private int memory[] = new int[MAX_MEM_SIZE]; // memory cells
+	final int MAX_MEM_SIZE = 30000; // number of memory cells
+	private byte memory[] = new byte[MAX_MEM_SIZE]; // memory cells
 	private int ptr = 0; // pointer to memory cell
-
-	private Stack<Integer> loopPoints = new Stack<Integer>(); // for '[' points, stack because LIFO
 
 	private int instrCounter = 0; // count instructions of code
 	private int totalInstrCounter = 0;
@@ -22,12 +19,13 @@ public class ParseMechanism implements Runnable {
 		init();
 	}
 
-	private void init() {		
-		Arrays.fill(memory, 0); // fill every memory cell with 0
-
+	private void init() {
+		for(byte b : memory)
+			b = 0;
+		
 		flag = new Flag(Flag.DOING_NOTHING);
 
-		instrCounter = -1;
+		instrCounter = -1; // -1 because of parseCode implementation & structure
 		totalInstrCounter = 0;
 
 		threadSuspended = false;
@@ -65,67 +63,98 @@ public class ParseMechanism implements Runnable {
 		return flag;
 	}
 
-	private Flag parseCodeChar() {
+	private Flag parseCode() {
 		
-		if(threadSuspended)
-			return flag;
-
-		++instrCounter;
-
-		if (instrCounter == totalInstrCounter) { // there are no further instructions
-			flag.current = Flag.FINISH;
-			return flag;
-		}
-		
-		flag.current = Flag.IN_PROGRESS;
-
-		switch (code[instrCounter]) {
-		case '.': // print mem cell
-			flag.current = Flag.TO_PRINT; // there is something to print
-			pauseThread();
-			return flag;
-
-		case ',': // get char and write its value to the mem cell
-			flag.current = Flag.GET_CHAR;
-			pauseThread();
-			return flag;
-
-		case '>':
-			if (++ptr > MAX_MEM_SIZE) {
-				flag.current = Flag.OUT_OF_MEM_BOUNDS;
+		while(!threadSuspended) {
+	
+			++instrCounter;
+	
+			if (instrCounter == totalInstrCounter) { // there are no further instructions
+				flag.current = Flag.FINISH;
 				return flag;
 			}
-			break;
-
-		case '<':
-			if (--ptr < 0) {
-				flag.current = Flag.OUT_OF_MEM_BOUNDS;
+			
+			flag.current = Flag.IN_PROGRESS;
+	
+			switch (code[instrCounter]) {
+			case '.': // print mem cell
+				flag.current = Flag.TO_PRINT; // there is something to print
+				pauseThread();
 				return flag;
+	
+			case ',': // get char and write its value to the mem cell
+				flag.current = Flag.GET_CHAR;
+				pauseThread();
+				return flag;
+	
+			case '>':
+				++ptr;
+				if (ptr >= MAX_MEM_SIZE) {
+					ptr = 0;
+				}
+				break;
+	
+			case '<':
+				--ptr;
+				if (ptr < 0) {
+					ptr = MAX_MEM_SIZE - 1;
+				}
+				break;
+	
+			case '+':
+				memory[ptr] = (memory[ptr] > Byte.MAX_VALUE) ? Byte.MAX_VALUE : ++memory[ptr]; // validation of byte limit
+				break;
+	
+			case '-':
+				memory[ptr] = (memory[ptr] > 0) ? --memory[ptr] : 0; // check if cell value > 0, decrements
+				break;
+	
+			case '[':
+				if(memory[ptr] == 0) //if the condition of exiting loop is met
+					moveToMatchingCloseBracket(instrCounter); // skip to the matching end for the loop
+				else
+					continue; // go to the next instruction
+	
+			case ']':		
+				if(memory[ptr] != 0) { // if condition of breaking loop is not met
+					moveToMatchingOpenBracket(instrCounter); // repeat loop
+				}
+				//else move to the next instr.
+				break;
 			}
-			break;
-
-		case '+':
-			memory[ptr] = (memory[ptr] > Integer.MAX_VALUE) ? Integer.MAX_VALUE : ++memory[ptr]; // validation of int limit
-			break;
-
-		case '-':
-			memory[ptr] = (memory[ptr] > 0) ? --memory[ptr] : 0; // check if cell value > 0, decrements
-			break;
-
-		case '[':
-			loopPoints.push(instrCounter); // add begin-loop-point on the stack
-			break;
-
-		case ']':
-			if (memory[ptr] != 0) { // if it is not the end of the loop
-				instrCounter = loopPoints.peek(); // move to the instruction position next of last '[' (loop begin)
-			} else if (!loopPoints.empty())
-				loopPoints.pop(); // remove last begin-loop-point from stack
-			break;
 		}
 		return new Flag(Flag.IN_PROGRESS);
 	}
-
+	
+	// TODO checking if endBracketPos is < totalInstrCounter
+	private void moveToMatchingCloseBracket(int fromPoint) { // search matching ] for [ standing at fromPoint position
+		int bracketsNum = 1;
+		int endBracketPos = fromPoint;
+		while(bracketsNum > 0) {
+			endBracketPos++;
+			if(code[endBracketPos] == '[')
+				bracketsNum++;
+			if(code[endBracketPos] == ']')
+				bracketsNum--;
+		}
+		
+		instrCounter = endBracketPos;
+	}
+	
+	private void moveToMatchingOpenBracket(int fromPoint) { // search matching [ for ] standing at fromPoint position
+		int bracketsNum = 1;
+		int begBracketPos = fromPoint;
+		while(bracketsNum > 0) {
+			begBracketPos--;
+			if(code[begBracketPos] == '[')
+				bracketsNum--;
+			if(code[begBracketPos] == ']')
+				bracketsNum++;
+		}
+		
+		instrCounter = begBracketPos;
+	}
+	
 	private synchronized void continueThread() {
 		flag.current = Flag.IN_PROGRESS;
 		threadSuspended = false;
@@ -144,7 +173,8 @@ public class ParseMechanism implements Runnable {
 
 	public synchronized void setChar(char ch) {
 		if (flag.current == Flag.GET_CHAR) {
-			memory[ptr] = (int) ch;
+			memory[ptr] = (byte) ch;
+			if((int)ch == 27) memory[ptr] = 0; //escape
 			continueThread();
 		}
 	}
@@ -165,7 +195,7 @@ public class ParseMechanism implements Runnable {
 				}
 				
 				else if(flag.current == Flag.IN_PROGRESS || flag.current == Flag.PARSED){
-					flag = parseCodeChar();
+					flag = parseCode();
 				}
 				
 				if (threadSuspended) { //waiting for char input or printing

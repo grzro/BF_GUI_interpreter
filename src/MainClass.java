@@ -19,61 +19,36 @@ public class MainClass extends JFrame implements KeyListener {
 	private Font consoleLikeFont;
 	private JLabel infoLabel;
 
-	ParseMechanism parser;
-	Thread updateGUIthread;
-	Thread parserThr;
+	private ParseMechanism parser;
+	private Thread updateGUIthread;
+	private Thread parserThr;
 
-	String startCodeStr;
+	private String startCodeStr;
 
 	public MainClass() {
 
 		// EVENT HANDLING
-		actionLnr = new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (e.getSource() == runButton) {
-					outputArea.setText("");
+		initActionListener();
+		
+		// code that is in codeArea at the program start
+		setStartCode();
 
-					parse(codeArea.getText());
+		// WINDOW
+		setWindowProp();
 
-					updateGUIthread = new Thread() {
-						@Override
-						public void run() {
-							while (parser.getState().current != Flag.FINISH) {
-								try {
-									Thread.sleep(1);
-									int flag = parser.getState().current;
-									switch (flag) {
-									case Flag.GET_CHAR:
-										readCharByOutputArea();
-										break;
-									case Flag.TO_PRINT:
-										appendCharToOutputArea(parser.getCharToPrint());
-										break;
-									case Flag.LOOP_ERROR:
-										outputArea.setText("Number of [ and ] is not equal");
-										parser.stopThr();
-										break;
-									case Flag.OUT_OF_MEM_BOUNDS:
-										outputArea.setText("Out od memory bounds");
-										parser.stopThr();
-										break;
-									}
-									showInfo(parser.getState());
-								} catch (Exception e) {
-								}
-							}
-						}
-					};
-					updateGUIthread.start();
-				}
-				if(e.getSource() == terminateButton) {
-					parser.stopThr();
-				}
-			}
-		};
+		// Elements inits
+		configureFont();
+
+		configureGUIelements();
+
+		// Adding elements to the window
+		addElemToWindow();
+
+	}
+
+	private void setStartCode() {
 		// Hello world program written to codeArea
-		startCodeStr = "++++++++++\r\n"
-				+ "[\r\n" + ">+++++++>++++++++++>+++>+<<<<-\r\n" + "]\r\n"
+		startCodeStr = "++++++++++\r\n" + "[\r\n" + ">+++++++>++++++++++>+++>+<<<<-\r\n" + "]\r\n"
 				+ ">++.               drukuje 'H'\r\n" + ">+.                drukuje 'e'\r\n"
 				+ "+++++++.           drukuje 'l'\r\n" + ".                  drukuje 'l'\r\n"
 				+ "+++.               drukuje 'o'\r\n" + ">++.               spacja\r\n"
@@ -81,18 +56,30 @@ public class MainClass extends JFrame implements KeyListener {
 				+ "+++.               drukuje 'r'\r\n" + "------.            drukuje 'l'\r\n"
 				+ "--------.          drukuje 'd'\r\n" + ">+.                drukuje '!'\r\n"
 				+ ">.                 nowa linia";
-
-		// WINDOW
+	}
+	
+	private void setWindowProp() {
 		setSize(540, 400);
 		setTitle("BrainFuck Interpreter by G.Romanczyk");
 		setVisible(true);
 		setResizable(false);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setLayout(null);
-
-		// Elements inits
+	}
+	
+	private void addElemToWindow() {
+		add(scrollCodeArea);
+		add(scrollOutputArea);
+		add(runButton);
+		add(terminateButton);
+		add(infoLabel);
+	}
+	
+	private void configureFont() {
 		consoleLikeFont = new Font("Consolas", Font.PLAIN, 14);
-
+	}
+	
+	private void configureGUIelements() {
 		codeArea = new JTextArea();
 		codeArea.setFont(consoleLikeFont);
 		codeArea.setLineWrap(true);
@@ -120,27 +107,67 @@ public class MainClass extends JFrame implements KeyListener {
 
 		runButton = new JButton("Run");
 		runButton.setBounds(450, 5, 70, 30);
-		runButton.setMargin(new Insets(0,0,0,0));
+		runButton.setMargin(new Insets(0, 0, 0, 0));
 		runButton.addActionListener(actionLnr);
-		
+
 		terminateButton = new JButton("Terminate");
 		terminateButton.setBounds(450, 40, 70, 30);
 		terminateButton.addActionListener(actionLnr);
-		terminateButton.setMargin(new Insets(0,0,0,0));
+		terminateButton.setMargin(new Insets(0, 0, 0, 0));
 
 		// labels with information about state of parsing and executing
 		infoLabel = new JLabel("Ready");
 		infoLabel.setBounds(450, 325, 90, 40);
 		infoLabel.setOpaque(true);
 		infoLabel.setVisible(true);
+	}
+	
+	private void initActionListener() {
+		actionLnr = new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (e.getSource() == runButton) {
+					outputArea.setText("");
+					parse(codeArea.getText());
+					configAndRunThrGUIandParser();
+				}
+				if (e.getSource() == terminateButton) {
+					parser.stopThr();
+				}
+			}
+		};
+	}
 
-		// Adding elements to the window
-		add(scrollCodeArea);
-		add(scrollOutputArea);
-		add(runButton);
-		add(terminateButton);
-		add(infoLabel);
-
+	private void configAndRunThrGUIandParser() {
+		updateGUIthread = new Thread() {
+			@Override
+			public void run() {
+				while (parser.getState().current != Flag.FINISH) {
+					try {
+						Thread.sleep(2);
+						int flag = parser.getState().current;
+						switch (flag) {
+						case Flag.GET_CHAR:
+							readCharByOutputArea();
+							break;
+						case Flag.TO_PRINT:
+							appendCharToOutputArea(parser.getCharToPrint());
+							break;
+						case Flag.LOOP_ERROR:
+							outputArea.setText("Number of [ and ] is not equal");
+							parser.stopThr();
+							break;
+						case Flag.OUT_OF_MEM_BOUNDS:
+							outputArea.setText("Out od memory bounds");
+							parser.stopThr();
+							break;
+						}
+						showInfo(parser.getState());
+					} catch (Exception e) {
+					}
+				}
+			}
+		};
+		updateGUIthread.start();
 	}
 
 	private void showInfo(Flag info) {
@@ -168,7 +195,7 @@ public class MainClass extends JFrame implements KeyListener {
 		outputArea.setEditable(true);
 		outputArea.requestFocus();
 	}
-	
+
 	@Override
 	public void keyTyped(KeyEvent e) { // keys without shift, ctrl etc
 		if (outputArea.hasFocus() && outputArea.isEditable()) {
@@ -193,10 +220,10 @@ public class MainClass extends JFrame implements KeyListener {
 		});
 	}
 
-	
 	@Override
-	public void keyPressed(KeyEvent e) { //any key, no need
+	public void keyPressed(KeyEvent e) { // any key, no need
 	}
+
 	@Override
 	public void keyReleased(KeyEvent e) {
 	}
