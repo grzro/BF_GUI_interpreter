@@ -2,6 +2,7 @@ import javax.swing.*;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.Insets;
 import java.awt.event.*;
 
 public class MainClass extends JFrame implements KeyListener {
@@ -13,9 +14,10 @@ public class MainClass extends JFrame implements KeyListener {
 	private JScrollPane scrollCodeArea;
 	private JScrollPane scrollOutputArea;
 	private JButton runButton;
+	private JButton terminateButton;
 	private ActionListener actionLnr;
 	private Font consoleLikeFont;
-	private JLabel inProgressInfoLabel, charInputInfoLabel, finishInfoLabel;
+	private JLabel infoLabel;
 
 	ParseMechanism parser;
 	Thread updateGUIthread;
@@ -49,9 +51,11 @@ public class MainClass extends JFrame implements KeyListener {
 										break;
 									case Flag.LOOP_ERROR:
 										outputArea.setText("Number of [ and ] is not equal");
+										parser.stopThr();
 										break;
 									case Flag.OUT_OF_MEM_BOUNDS:
 										outputArea.setText("Out od memory bounds");
+										parser.stopThr();
 										break;
 									}
 									showInfo(parser.getState());
@@ -62,11 +66,14 @@ public class MainClass extends JFrame implements KeyListener {
 					};
 					updateGUIthread.start();
 				}
-
+				if(e.getSource() == terminateButton) {
+					parser.stopThr();
+				}
 			}
 		};
 		// Hello world program written to codeArea
-		startCodeStr = "++++++++++\r\n" + "[\r\n" + ">+++++++>++++++++++>+++>+<<<<-\r\n" + "]\r\n"
+		startCodeStr = "++++++++++\r\n"
+				+ "[\r\n" + ">+++++++>++++++++++>+++>+<<<<-\r\n" + "]\r\n"
 				+ ">++.               drukuje 'H'\r\n" + ">+.                drukuje 'e'\r\n"
 				+ "+++++++.           drukuje 'l'\r\n" + ".                  drukuje 'l'\r\n"
 				+ "+++.               drukuje 'o'\r\n" + ">++.               spacja\r\n"
@@ -113,50 +120,42 @@ public class MainClass extends JFrame implements KeyListener {
 
 		runButton = new JButton("Run");
 		runButton.setBounds(450, 5, 70, 30);
+		runButton.setMargin(new Insets(0,0,0,0));
 		runButton.addActionListener(actionLnr);
+		
+		terminateButton = new JButton("Terminate");
+		terminateButton.setBounds(450, 40, 70, 30);
+		terminateButton.addActionListener(actionLnr);
+		terminateButton.setMargin(new Insets(0,0,0,0));
 
 		// labels with information about state of parsing and executing
-		inProgressInfoLabel = new JLabel("in progress");
-		inProgressInfoLabel.setBounds(450, 325, 90, 40);
-		inProgressInfoLabel.setOpaque(true);
-		inProgressInfoLabel.setVisible(false);
-
-		charInputInfoLabel = new JLabel("input char");
-		charInputInfoLabel.setBounds(455, 325, 90, 40);
-		charInputInfoLabel.setOpaque(true);
-		charInputInfoLabel.setVisible(false);
-
-		finishInfoLabel = new JLabel("Finish");
-		finishInfoLabel.setBounds(465, 325, 90, 40);
-		finishInfoLabel.setOpaque(true);
-		finishInfoLabel.setVisible(false);
+		infoLabel = new JLabel("Ready");
+		infoLabel.setBounds(450, 325, 90, 40);
+		infoLabel.setOpaque(true);
+		infoLabel.setVisible(true);
 
 		// Adding elements to the window
 		add(scrollCodeArea);
 		add(scrollOutputArea);
 		add(runButton);
-		add(inProgressInfoLabel);
-		add(charInputInfoLabel);
-		add(finishInfoLabel);
+		add(terminateButton);
+		add(infoLabel);
 
 	}
 
 	private void showInfo(Flag info) {
 		switch (info.current) {
 		case Flag.FINISH:
-			finishInfoLabel.setVisible(true);
-			inProgressInfoLabel.setVisible(false);
-			charInputInfoLabel.setVisible(false);
+			infoLabel.setText("Finished");
 			break;
 		case Flag.IN_PROGRESS:
-			inProgressInfoLabel.setVisible(true);
-			finishInfoLabel.setVisible(false);
-			charInputInfoLabel.setVisible(false);
+			infoLabel.setText("In progress...");
 			break;
 		case Flag.GET_CHAR:
-			finishInfoLabel.setVisible(false);
-			inProgressInfoLabel.setVisible(false);
-			charInputInfoLabel.setVisible(true);
+			infoLabel.setText("Get char");
+			break;
+		case Flag.TERMINATED:
+			infoLabel.setText("Terminated");
 			break;
 		}
 	}
@@ -169,9 +168,9 @@ public class MainClass extends JFrame implements KeyListener {
 		outputArea.setEditable(true);
 		outputArea.requestFocus();
 	}
-
+	
 	@Override
-	public void keyPressed(KeyEvent e) {
+	public void keyTyped(KeyEvent e) { // keys without shift, ctrl etc
 		if (outputArea.hasFocus() && outputArea.isEditable()) {
 			parser.setChar(e.getKeyChar());
 			outputArea.setEditable(false);
@@ -194,10 +193,10 @@ public class MainClass extends JFrame implements KeyListener {
 		});
 	}
 
+	
 	@Override
-	public void keyTyped(KeyEvent e) {
+	public void keyPressed(KeyEvent e) { //any key, no need
 	}
-
 	@Override
 	public void keyReleased(KeyEvent e) {
 	}

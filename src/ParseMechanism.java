@@ -15,8 +15,8 @@ public class ParseMechanism implements Runnable {
 
 	private char code[] = null; // to store parsed code
 
-	boolean killThread;
-	boolean threadSuspended;
+	private boolean killThread;
+	private boolean threadSuspended;
 
 	public ParseMechanism() {
 		init();
@@ -35,10 +35,12 @@ public class ParseMechanism implements Runnable {
 	}
 
 	public static int countAllOccurrences(String str, char ch) {
-		int lastIndex = 0;
+		int lastIndex = str.indexOf(ch);
 		int count = 0;
-		while ((lastIndex = str.indexOf(ch, (lastIndex > 0) ? lastIndex + 1: 0)) != -1)
+		while (lastIndex >= 0) {
+			lastIndex = str.indexOf(ch, lastIndex + 1);
 			count++;
+		}
 
 		return count;
 	}
@@ -63,7 +65,7 @@ public class ParseMechanism implements Runnable {
 		return flag;
 	}
 
-	public Flag parseCodeChar() {
+	private Flag parseCodeChar() {
 		
 		if(threadSuspended)
 			return flag;
@@ -80,12 +82,12 @@ public class ParseMechanism implements Runnable {
 		switch (code[instrCounter]) {
 		case '.': // print mem cell
 			flag.current = Flag.TO_PRINT; // there is something to print
-			lockThread();
+			pauseThread();
 			return flag;
 
 		case ',': // get char and write its value to the mem cell
 			flag.current = Flag.GET_CHAR;
-			lockThread();
+			pauseThread();
 			return flag;
 
 		case '>':
@@ -103,8 +105,7 @@ public class ParseMechanism implements Runnable {
 			break;
 
 		case '+':
-			memory[ptr] = (memory[ptr] > Integer.MAX_VALUE) ? Integer.MAX_VALUE : ++memory[ptr]; // validation of int
-																									// limit
+			memory[ptr] = (memory[ptr] > Integer.MAX_VALUE) ? Integer.MAX_VALUE : ++memory[ptr]; // validation of int limit
 			break;
 
 		case '-':
@@ -125,18 +126,18 @@ public class ParseMechanism implements Runnable {
 		return new Flag(Flag.IN_PROGRESS);
 	}
 
-	private synchronized void unlockThread() {
+	private synchronized void continueThread() {
 		flag.current = Flag.IN_PROGRESS;
 		threadSuspended = false;
 		notify();
 	}
 	
-	private void lockThread() {
+	private void pauseThread() {
 		threadSuspended = true;
 	}
 	
 	public synchronized char getCharToPrint() {
-		unlockThread();
+		continueThread();
 		notify();
 		return (char) memory[ptr];
 	}
@@ -144,7 +145,7 @@ public class ParseMechanism implements Runnable {
 	public synchronized void setChar(char ch) {
 		if (flag.current == Flag.GET_CHAR) {
 			memory[ptr] = (int) ch;
-			unlockThread();
+			continueThread();
 		}
 	}
 	
@@ -158,8 +159,10 @@ public class ParseMechanism implements Runnable {
 			try {
 				Thread.sleep(1);
 				
-				if(flag.current == Flag.FINISH)
+				if(flag.current == Flag.FINISH) {
 					stopThr(); // kill thread
+					flag.current = Flag.FINISH; //reassigned because stopThr() sets flag TERMINATED
+				}
 				
 				else if(flag.current == Flag.IN_PROGRESS || flag.current == Flag.PARSED){
 					flag = parseCodeChar();
@@ -178,7 +181,7 @@ public class ParseMechanism implements Runnable {
 	}
 
 	public synchronized void stopThr() {
-		lockThread();
+		flag.current = Flag.TERMINATED;
 		killThread = true;
 		notify();
 	}
