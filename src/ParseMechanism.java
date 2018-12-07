@@ -7,8 +7,8 @@ public class ParseMechanism implements Runnable {
 	private byte memory[] = new byte[MAX_MEM_SIZE]; // memory cells
 	private int ptr = 0; // pointer to memory cell
 
-	private int instrCounter = 0; // count instructions of code
-	private int totalInstrCounter = 0;
+	private int instrCounter; // count instructions of code
+	private int totalInstrCounter;
 
 	private char code[] = null; // to store parsed code
 
@@ -27,12 +27,13 @@ public class ParseMechanism implements Runnable {
 
 		instrCounter = -1; // -1 because of parseCode implementation & structure
 		totalInstrCounter = 0;
+		ptr = 0;
 
 		threadSuspended = false;
 		killThread = false;
 	}
 
-	public static int countAllOccurrences(String str, char ch) {
+	private int countAllOccurrences(String str, char ch) {
 		int lastIndex = str.indexOf(ch);
 		int count = 0;
 		while (lastIndex >= 0) {
@@ -63,29 +64,28 @@ public class ParseMechanism implements Runnable {
 		return flag;
 	}
 
-	private Flag parseCode() {
+	private void parseCode() {
 		
 		while(!threadSuspended) {
 	
 			++instrCounter;
+			flag.current = Flag.IN_PROGRESS;
 	
 			if (instrCounter == totalInstrCounter) { // there are no further instructions
 				flag.current = Flag.FINISH;
-				return flag;
+				return;
 			}
-			
-			flag.current = Flag.IN_PROGRESS;
 	
 			switch (code[instrCounter]) {
 			case '.': // print mem cell
 				flag.current = Flag.TO_PRINT; // there is something to print
 				pauseThread();
-				return flag;
+				return;
 	
 			case ',': // get char and write its value to the mem cell
 				flag.current = Flag.GET_CHAR;
 				pauseThread();
-				return flag;
+				return;
 	
 			case '>':
 				++ptr;
@@ -102,7 +102,7 @@ public class ParseMechanism implements Runnable {
 				break;
 	
 			case '+':
-				memory[ptr] = (memory[ptr] > Byte.MAX_VALUE) ? Byte.MAX_VALUE : ++memory[ptr]; // validation of byte limit
+				memory[ptr] = (memory[ptr] == Byte.MAX_VALUE) ? 0 : ++memory[ptr]; // validation of byte limit
 				break;
 	
 			case '-':
@@ -112,8 +112,8 @@ public class ParseMechanism implements Runnable {
 			case '[':
 				if(memory[ptr] == 0) //if the condition of exiting loop is met
 					moveToMatchingCloseBracket(instrCounter); // skip to the matching end for the loop
-				else
-					continue; // go to the next instruction
+				//else run code in loop (go to next instr.)
+				break;
 	
 			case ']':		
 				if(memory[ptr] != 0) { // if condition of breaking loop is not met
@@ -123,14 +123,15 @@ public class ParseMechanism implements Runnable {
 				break;
 			}
 		}
-		return new Flag(Flag.IN_PROGRESS);
 	}
 	
-	// TODO checking if endBracketPos is < totalInstrCounter
 	private void moveToMatchingCloseBracket(int fromPoint) { // search matching ] for [ standing at fromPoint position
 		int bracketsNum = 1;
 		int endBracketPos = fromPoint;
 		while(bracketsNum > 0) {
+			if(endBracketPos > totalInstrCounter) // It shouldn't be true because of validation in deliverCode() but... :)
+				return; //exit function
+			
 			endBracketPos++;
 			if(code[endBracketPos] == '[')
 				bracketsNum++;
@@ -145,6 +146,9 @@ public class ParseMechanism implements Runnable {
 		int bracketsNum = 1;
 		int begBracketPos = fromPoint;
 		while(bracketsNum > 0) {
+			if(begBracketPos < 0) //same as in moveToMatchingCloseBracket()
+				return;
+			
 			begBracketPos--;
 			if(code[begBracketPos] == '[')
 				bracketsNum--;
@@ -195,7 +199,7 @@ public class ParseMechanism implements Runnable {
 				}
 				
 				else if(flag.current == Flag.IN_PROGRESS || flag.current == Flag.PARSED){
-					flag = parseCode();
+					parseCode();
 				}
 				
 				if (threadSuspended) { //waiting for char input or printing
